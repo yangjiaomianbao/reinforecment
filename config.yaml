@@ -1,0 +1,86 @@
+# 起步候选值，尚未通过预实验校准；样本数仅为计划，不自动启动生成。
+seed: 20261110
+
+graph:
+  N: 30
+  M2: 60
+  M3: 30
+  skeleton_types: [ER, WS, SBM]
+  hyperedge_types: [Uniform, Overlap, Community, Heterogeneous]
+  pilot_graphs_per_combo: 8
+  matched_groups: 12
+  matched_variants: 3
+  ws_k: 4
+  ws_rewire_probability: 0.1
+  ws_rewire_candidates: [0.1, 0.3]
+  sbm_within_between_ratio: 5.0
+  sbm_ratio_candidates: [5.0, 10.0]
+  overlap_strength: medium
+  # 依次为随机、与锚边恰好共享一个节点、恰好共享两个节点的提案概率。
+  overlap_probabilities:
+    weak: [0.80, 0.15, 0.05]
+    medium: [0.50, 0.30, 0.20]
+    strong: [0.25, 0.35, 0.40]
+  # 以下为未校准的实现候选；社区模式顺序为 3:0、2:1、1:1:1。
+  community_pattern_probabilities: [0.3333333333333333, 0.3333333333333333, 0.3333333333333333]
+  heterogeneous_log_weight_sigma: 1.0
+  max_attempts_per_edge: 100
+
+rewiring:
+  # 单个祖先组的候选预算；不自动运行 12 组正式配对试验。
+  exploration_chains: 4
+  exploration_attempts_per_edge: 200
+  target_attempts_per_edge: 200
+  temperature: 1.0
+  target_tolerance: 1
+  xi_A_tolerance: 0.05
+
+dataset:
+  smoke_groups: 3
+  # 只作为候选记录；不会据此自动批量生成正式数据。
+  candidate_counts:
+    train: 960
+    validation: 192
+    test_id: 240
+    ood_size: 120
+    ood_structure: 120
+
+hgnn:
+  hidden_dim: 64
+  local_layers: 2
+  heads: 4
+  global_layers: 1
+  distance_max: 6
+  aggregation: sum_mlp
+  residual: true
+  layer_norm: true
+
+sir:
+  beta1_candidates: [0.04, 0.08, 0.12]
+  beta2_candidates: [0.0, 0.08, 0.16, 0.32]
+  # 仅供单次冒烟运行的候选组合，尚未校准或冻结为主实验参数。
+  beta1: 0.08
+  beta2: 0.16
+  mu: 0.20
+  rho0_candidates: [0.05, 0.10, 0.15]
+  rho0: 0.10
+  max_steps: 2000
+  calibration_mc: 64
+  train_mc: 128
+  val_mc: 1024
+  test_mc: 2048
+
+rl:
+  K: 4
+  gamma: 1.0
+  batch_size: 32
+  learning_rate: 0.0003
+  capacity: 10000
+  warmup_transitions: 500
+  target_tau: 0.005
+  epsilon_start: 1.0
+  epsilon_end: 0.05
+  epsilon_decay_steps: 5000
+  validation_interval: 100
+  target_entropy_ratio: 0.7
+  initial_alpha: 0.1
