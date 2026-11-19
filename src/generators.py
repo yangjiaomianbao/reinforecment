@@ -168,6 +168,66 @@ def generate_graph(config=None, skeleton="ER", hyperedge="Uniform", seed=None,
     return graph, metadata
 
 
+def generate_course_graph(course, *, seed, cross_binary=6):
+    """课程 A/B：固定分块数量，随机化社区成员；不使用传播结果或重要性标签。"""
+    if course not in ("A", "B") or cross_binary not in (4, 6, 10):
+        raise ValueError("课程应为 A/B，跨社区二元边应为 4/6/10")
+    if course == "A":
+        cross_binary = 6
+    rng = np.random.default_rng(np.random.SeedSequence([seed, 101]))
+    communities = rng.permutation(30).reshape(3, 10)
+    labels = np.empty(30, dtype=int)
+    for index, nodes in enumerate(communities):
+        labels[nodes] = index
+    pairs = np.asarray(list(combinations(range(30), 2)))
+    inside = labels[pairs[:, 0]] == labels[pairs[:, 1]]
+    binary = np.concatenate((pairs[inside][rng.choice(inside.sum(), 60-cross_binary, replace=False)],
+                             pairs[~inside][rng.choice((~inside).sum(), cross_binary, replace=False)]))
+    triples, internal = set(), []
+    for nodes in communities:
+        candidates = list(combinations(sorted(map(int, nodes)), 3))
+        selected = [candidates[i] for i in rng.choice(len(candidates), 6 if course == "A" else 4, replace=False)]
+        triples.update(selected)
+        internal.append(selected)
+    channels = []
+    for source in range(3):
+        for target in range(3):
+            if source == target:
+                continue
+            pair = rng.choice(communities[source], 2, replace=False)
+            targets = rng.choice(communities[target], 1 if course == "A" else 2, replace=False)
+            edges = [tuple(sorted([int(pair[0]), int(pair[1]), int(node)])) for node in targets]
+            triples.update(edges)
+            channels.append((pair, target, set(map(int, targets))))
+    if course == "A":
+        # 六条对照边位于社区内，与已有内部超边共享两个成员。
+        for community, anchors in zip(communities, internal):
+            candidates = sorted({tuple(sorted([*pair, int(node)]))
+                                 for anchor in anchors for pair in combinations(anchor, 2)
+                                 for node in community if node not in pair} - triples)
+            triples.update(candidates[i] for i in rng.choice(len(candidates), 2, replace=False))
+    else:
+        # 每个有向社区通道增加一个共享节点对的替代通道，总数恰为六条。
+        for pair, target, used in channels:
+            node = rng.choice([n for n in communities[target] if n not in used])
+            triples.add(tuple(sorted([int(pair[0]), int(pair[1]), int(node)])))
+    graph = Graph("pending", "pending", 30, binary, sorted(triples))
+    if graph.M2 != 60 or graph.M0 != 30:
+        raise RuntimeError("课程生成的边数不符合 60/30")
+    skeleton = hashlib.sha256(np.asarray([30], dtype="<i8").tobytes()
+                              + graph.edge_index_2.astype("<i4").tobytes())
+    digest = skeleton.copy()
+    digest.update(graph.hyperedge_nodes_3.astype("<i4").tobytes())
+    graph = Graph("graph_" + digest.hexdigest()[:16], "skeleton_" + skeleton.hexdigest()[:16],
+                  30, graph.edge_index_2, graph.hyperedge_nodes_3)
+    return graph, {"seed": int(seed), "generator_type": f"Course{course}/CommunityChannels",
+                   "course_stage": course, "community_labels": labels.tolist(),
+                   "parameters": {"N": 30, "M2": 60, "M3": 30, "cross_binary": cross_binary,
+                                  "internal_triples": 18 if course == "A" else 12,
+                                  "channel_triples": 6 if course == "A" else 12,
+                                  "control_triples": 6}}
+
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="生成一张候选混合超图并输出结构统计")
     parser.add_argument("--config", default=None)

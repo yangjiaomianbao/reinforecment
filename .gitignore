@@ -9,3 +9,8 @@ venv/
 .env.*
 !.env.example
 .DS_Store
+
+# 实验续跑缓存；正式 CSV、图、配置及模型继续纳入版本管理。
+outputs/**/progress.sqlite
+outputs/**/progress.sqlite-wal
+outputs/**/progress.sqlite-shm
